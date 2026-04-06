@@ -1,62 +1,87 @@
-from fastapi import FastAPI
+"""api/main.py — FastAPI ML service"""
+
+import sys
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Optional
+
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import time
 
-app = FastAPI(title="Diabetic Retinopathy ML Service")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-CLASS_NAMES = [
-    "No DR",
-    "Mild",
-    "Moderate",
-    "Severe",
-    "Proliferative"
-]
+import inference.model_loader as loader
+from inference.predict import predict
 
-class PredictionRequest(BaseModel):
-    image_url: str
 
-class ExplanationRequest(BaseModel):
-    image_url: str
-    method: str | None = None
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("Loading DR model artifacts …")
+    loader.load_all_artifacts()
+    print("ML service ready.\n")
+    yield
 
-@app.get("/health")
-def health():
-    return {"status": "ML service running"}
 
-@app.post("/predict")
-def predict(request: PredictionRequest):
-    start_time = time.time()
+app = FastAPI(title="DR Screening ML Service", version="1.1.0", lifespan=lifespan)
 
-    # MOCK OUTPUT FOR NOW
-    class_index = 2
-    confidence = 0.87
+app.add_middleware(
+    CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
+)
 
-    inference_time = int((time.time() - start_time) * 1000)
 
-    return {
-        "prediction": {
-            "label": CLASS_NAMES[class_index],
-            "class_index": class_index,
-            "confidence": confidence
-        },
-        "class_probabilities": {
-            name: round(1/5, 2) for name in CLASS_NAMES
-        },
-        "model_version": "v1.0",
-        "inference_time_ms": inference_time
-    }
+class PredictionResponse(BaseModel):
+    patient_id:            str
+    binary_label:          int
+    binary_prediction:     str
+    dr_confidence:         float
+    multiclass_label:      int
+    multiclass_prediction: str
+    stage_guess:           int
+    gradcam_base64:        Optional[str] = None
+    lime_base64:           Optional[str] = None
+    shap_base64:           Optional[str] = None
+    clinical_report:       Optional[str] = None
+    patient_report:        Optional[str] = None
+    processing_time_ms:    int
 
-@app.post("/explain")
-def explain(request: ExplanationRequest):
-    return {
-        "methods_used": ["LIME", "SHAP"],
-        "heatmaps": {
-            "lime": "mock_lime.png",
-            "shap": "mock_shap.png"
-        },
-        "important_regions": [
-            "Macula region",
-            "Hemorrhage-dense clusters"
-        ],
-        "text_summary": "Model focused on lesion-dense regions near macula."
-    }
+
+class HealthResponse(BaseModel):
+    status:                str
+    device:                str
+    backbones_loaded:      int
+    opt_thresh:            float
+    pca_binary_components: int
+    pca_multi_components:  int
+
+
+@app.get("/health", response_model=HealthResponse, tags=["ops"])
+async def health():
+    if not loader.finetuned_models:
+        raise HTTPException(status_code=503, detail="Artifacts not loaded yet.")
+    return HealthResponse(
+        status="ok", device=str(loader.DEVICE),
+        backbones_loaded=len(loader.finetuned_models),
+        opt_thresh=loader.meta.get("opt_thresh", -1.0),
+        pca_binary_components=loader.meta.get("pca_binary_components", -1),
+        pca_multi_components=loader.meta.get("pca_multi_components", -1),
+    )
+
+
+@app.post("/predict", response_model=PredictionResponse, tags=["inference"])
+async def predict_endpoint(
+    file: UploadFile = File(...),
+    patient_id: str  = Form(default="PATIENT"),
+):
+    if file.content_type and not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=415, detail=f"Expected image, got {file.content_type}")
+    image_bytes = await file.read()
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="Empty file.")
+    try:
+        result = predict(image_bytes, patient_id=patient_id)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Inference error: {e}")
+    return PredictionResponse(**result)

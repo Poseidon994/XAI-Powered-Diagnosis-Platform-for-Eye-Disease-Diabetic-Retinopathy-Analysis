@@ -1,0 +1,68 @@
+.report-card { }
+
+.report-badge {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--terracotta);
+  background: var(--terracotta-xlight);
+  border: 1px solid rgba(184, 71, 44, 0.15);
+  border-radius: 100px;
+  padding: 3px 10px;
+}
+
+.report-body {
+  padding: 1.5rem;
+}
+
+.report-section {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.report-section.last {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.report-section-title {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--charcoal);
+  margin-bottom: 0.6rem;
+}
+
+.report-text {
+  font-size: 14px;
+  color: var(--warm-grey);
+  line-height: 1.75;
+}
+
+.report-finding {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 13.5px;
+  color: var(--charcoal-mid);
+}
+
+.report-finding:last-child { border-bottom: none; }
+
+.finding-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--sage-light);
+  color: var(--sage);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+  font-size: 10px;
+  font-weight: 700;
+}
