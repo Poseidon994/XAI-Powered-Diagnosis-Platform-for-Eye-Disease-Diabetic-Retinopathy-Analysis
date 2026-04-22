@@ -19,4 +19,14 @@ env/
 .DS_Store
 Thumbs.db
 
-models/
+# ML model artifacts
+*.pth
+*.pt
+*.pkl
+*.joblib
+*.h5
+*.onnx
+*.bin
+
+# Specific model directory
+ml_service/models/
