@@ -1,0 +1,147 @@
+version: "3.9"
+
+# ── Ocula DR — Full Stack Docker Compose ─────────────────────────────────────
+#
+# Services:
+#   db          PostgreSQL 16
+#   ml_service  FastAPI inference server (port 8001)
+#   backend     Node.js/Express API gateway (port 5000)
+#   frontend    React app served by nginx (port 3000 → 80)
+#
+# Usage:
+#   1. Copy .env.example to .env and fill in your values
+#   2. docker compose up --build
+#   3. Open http://localhost:3000
+#
+# To rebuild a single service after code changes:
+#   docker compose up --build ml_service
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: ocula_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-ocula}
+      POSTGRES_USER:     ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in .env}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-ocula}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - ocula_net
+
+  # ── ML Service ──────────────────────────────────────────────────────────────
+  ml_service:
+    build:
+      context: ./ml_service
+      dockerfile: Dockerfile
+    container_name: ocula_ml
+    restart: unless-stopped
+    environment:
+      GROQ_API_KEY:  ${GROQ_API_KEY:-}
+      LIME_SAMPLES:  ${LIME_SAMPLES:-50}
+      ENABLE_LIME:   ${ENABLE_LIME:-true}
+      ENABLE_SHAP:   ${ENABLE_SHAP:-true}
+    # volumes:
+    #   # Models are mounted — never baked into the image.
+    #   # This lets you update .pth / .pkl files without rebuilding.
+    #   - ./ml_service/models:/app/models:ro
+    # Tell PyTorch and torchvision to store downloaded weights here.
+      # This folder is backed by the torch_cache volume so weights
+      # survive container restarts and are never re-downloaded.
+      TORCH_HOME:    /app/torch_cache
+    volumes:
+          # Trained model artifacts (.pth / .pkl) — read-only, never baked in
+          - ./ml_service/models:/app/models:ro
+          # PyTorch hub cache — persists pretrained backbone weights across restarts
+          - torch_cache:/app/torch_cache
+    ports:
+      - "8001:8001"
+    networks:
+      - ocula_net
+    # healthcheck:
+    #   test: ["CMD-SHELL", "curl -sf http://localhost:8001/health || exit 1"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 5
+    #   start_period: 60s   # Models take ~30s to load on first start
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 30s
+      timeout: 15s
+      retries: 10
+      start_period: 180s
+
+  # ── Backend ─────────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ocula_backend
+    restart: unless-stopped
+    environment:
+      PORT:            5000
+      NODE_ENV:        production
+      DATABASE_URL:    postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-ocula}
+      ML_SERVICE_URL:  http://ml_service:8001
+      CLIENT_ORIGIN:   http://localhost:3000
+      JWT_SECRET:      ${JWT_SECRET:?JWT_SECRET is required in .env}
+      JWT_EXPIRES:     ${JWT_EXPIRES:-7d}
+      MAX_FILE_SIZE:   ${MAX_FILE_SIZE:-10485760}
+    ports:
+      - "5000:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+      ml_service:
+        condition: service_healthy
+    networks:
+      - ocula_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5000/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Frontend ─────────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Backend URL as seen FROM THE BROWSER (not inside Docker network).
+        # In production, replace with your actual domain.
+        REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:5000}
+    container_name: ocula_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - ocula_net
+
+# ── Volumes ───────────────────────────────────────────────────────────────────
+volumes:
+  pg_data:
+    driver: local
+ 
+  # Persists PyTorch pretrained backbone weights (.pth files downloaded from
+  # pytorch.org on first run). After the first docker compose up, subsequent
+  # starts skip all downloads and load instantly.
+  torch_cache:
+    driver: local
+
+# ── Networks ──────────────────────────────────────────────────────────────────
+networks:
+  ocula_net:
+    driver: bridge

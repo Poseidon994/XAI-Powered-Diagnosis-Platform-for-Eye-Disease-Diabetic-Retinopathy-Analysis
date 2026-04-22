@@ -1,52 +1,54 @@
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;500;600;700;900&family=Figtree:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Fira+Code:wght@300;400;500&display=swap');
 
+/* ─── Design Tokens ──────────────────────────────────────────────── */
 :root {
-  /* Backgrounds — deep warm slate */
-  --bg:        #07111f;
-  --surface:   #0b1826;
-  --card:      #0f1f2e;
-  --card-hi:   #132435;
-  --border:    #1b2f42;
-  --border-hi: #254159;
+  /* Surfaces — deep warm purple-slate */
+  --bg:           #0d0b15;
+  --surface:      #130f1e;
+  --card:         #1a1528;
+  --card-hi:      #221c34;
+  --border:       #2c2040;
+  --border-hi:    #3e2f5c;
 
-  /* Primary — sage mint */
-  --sage:      #5eead4;
-  --sage-dim:  #2dd4bf;
-  --sage-glow: rgba(94,234,212,0.08);
-  --sage-hi:   rgba(94,234,212,0.18);
+  /* Primary — rose / soft pink */
+  --cyan:         #f472b6;
+  --cyan-dim:     #db2777;
+  --cyan-glow:    rgba(244,114,182,0.11);
+  --cyan-glow-hi: rgba(244,114,182,0.22);
 
-  /* Secondary — soft periwinkle */
-  --iris:      #a5b4fc;
-  --iris-glow: rgba(165,180,252,0.08);
+  /* Secondary — warm amber (used for AI/report sections) */
+  --indigo:       #fbbf24;
+  --indigo-glow:  rgba(251,191,36,0.10);
 
   /* Semantic */
-  --green:     #6ee7b7;
-  --amber:     #fcd34d;
-  --rose:      #fda4af;
-  --red:       #f87171;
-
-  /* Text */
-  --text:      #e8f0f7;
-  --text-dim:  #8ba8c4;
-  --text-muted:#3d5a75;
+  --green:        #6ee7b7;
+  --amber:        #fb923c;
+  --red:          #f87171;
+  --lavender:     #c4b5fd;
 
   /* Typography */
-  --serif:  'Instrument Serif', Georgia, serif;
-  --sans:   'Plus Jakarta Sans', system-ui, sans-serif;
-  --mono:   'JetBrains Mono', 'Fira Code', monospace;
+  --text:         #fdf6ff;
+  --text-dim:     #c0aad8;
+  --text-muted:   #6e5c8a;
 
-  /* Shape */
+  /* Fonts */
+  --font-display: 'Unbounded', sans-serif;
+  --font-body:    'Figtree', sans-serif;
+  --font-mono:    'Fira Code', monospace;
+
+  /* Radii */
   --r-sm: 6px;
   --r-md: 10px;
   --r-lg: 16px;
-  --r-xl: 20px;
+  --r-xl: 22px;
 }
 
+/* ─── Reset ──────────────────────────────────────────────────────── */
 *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
 html { font-size:16px; scroll-behavior:smooth; }
 
 body {
-  font-family: var(--sans);
+  font-family: var(--font-body);
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
@@ -54,40 +56,53 @@ body {
   overflow-x: hidden;
 }
 
-/* Subtle dot grid */
+/* Warm grid */
 body::before {
   content:'';
   position:fixed; inset:0;
-  background-image: radial-gradient(circle, rgba(94,234,212,0.06) 1px, transparent 1px);
-  background-size: 32px 32px;
+  background-image:
+    linear-gradient(rgba(244,114,182,0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(244,114,182,0.018) 1px, transparent 1px);
+  background-size:52px 52px;
   pointer-events:none; z-index:0;
 }
 
-/* Top ambient glow */
+/* Warm rose glow at top */
 body::after {
   content:'';
   position:fixed;
-  top:-300px; left:50%; transform:translateX(-50%);
-  width:1000px; height:500px;
-  background:radial-gradient(ellipse, rgba(94,234,212,0.04) 0%, transparent 65%);
+  top:-280px; left:50%; transform:translateX(-50%);
+  width:900px; height:500px;
+  background:radial-gradient(ellipse, rgba(244,114,182,0.07) 0%, transparent 68%);
   pointer-events:none; z-index:0;
 }
 
+/* ─── Scrollbar ──────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width:5px; }
 ::-webkit-scrollbar-track { background:var(--surface); }
 ::-webkit-scrollbar-thumb { background:var(--border-hi); border-radius:3px; }
+::-webkit-scrollbar-thumb:hover { background:var(--cyan-dim); }
 
+/* ─── Keyframes ──────────────────────────────────────────────────── */
 @keyframes fadeUp {
-  from { opacity:0; transform:translateY(18px); }
+  from { opacity:0; transform:translateY(22px); }
   to   { opacity:1; transform:translateY(0); }
 }
 @keyframes spin { to { transform:rotate(360deg); } }
 @keyframes scanline { 0%{top:-2px} 100%{top:100%} }
-@keyframes softpulse {
-  0%,100% { opacity:1; box-shadow:0 0 6px var(--sage); }
-  50%      { opacity:.5; box-shadow:0 0 12px var(--sage); }
+@keyframes pulsering {
+  0%   { transform:scale(1);   opacity:.7; }
+  100% { transform:scale(1.9); opacity:0; }
 }
-@keyframes ringpulse {
-  0%   { transform:scale(1);   opacity:.6; }
-  100% { transform:scale(2);   opacity:0; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+@keyframes slideIn {
+  from { opacity:0; transform:translateX(-10px); }
+  to   { opacity:1; transform:translateX(0); }
 }
+@keyframes shimmer {
+  0%   { background-position:-600px 0; }
+  100% { background-position: 600px 0; }
+}
+
+/* ─── Utility ────────────────────────────────────────────────────── */
+.z1 { position:relative; z-index:1; }
